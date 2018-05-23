@@ -3,8 +3,8 @@ package pl.iterators.jwt
 import java.util.{Map => jMap}
 
 import com.auth0.jwt.interfaces.Claim
-import shapeless.Witness
 import shapeless.labelled._
+import shapeless.{::, HList, HNil, Witness}
 
 trait ClaimsDecoder[T] {
   def decode(claims: jMap[String, Claim]): T
@@ -25,4 +25,17 @@ object ClaimsDecoder {
                                                        implicit witness: Witness.Aux[K],
                                                        thisType: PrivateClaimType[V]): ClaimsDecoder[FieldType[K, V]] =
     new FieldTypeDecoder[K, V](witness.value.name, field[K], thisType)
+
+  implicit object HNilDecoder extends ClaimsDecoder[HNil] {
+    def decode(claims: jMap[String, Claim]) = HNil
+  }
+  implicit def HListDecoder[K, V, Rest <: HList](
+                                                  implicit headDecoder: ClaimsDecoder[FieldType[K, V]],
+                                                  restDecoder: ClaimsDecoder[Rest]): ClaimsDecoder[FieldType[K, V] :: Rest] =
+    (claims: jMap[String, Claim]) => {
+      val head = headDecoder.decode(claims)
+      val rest = restDecoder.decode(claims)
+
+      ::(head, rest)
+    }
 }
