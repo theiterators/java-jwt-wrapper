@@ -1,11 +1,15 @@
 package pl.iterators.jwt
 
-import java.time.Instant
 import java.time.temporal.ChronoUnit._
+import java.time.{Duration, Instant}
 import java.util.{Date, UUID}
 
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.exceptions._
 import org.scalatest._
+import shapeless.HNil
+import shapeless.record._
+import shapeless.syntax.singleton._
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
@@ -65,7 +69,7 @@ class JwtClaimSpecs extends FlatSpec with Matchers {
 
   import GenericEncodeDecodeBehaviors._
 
-  case class SimpleClaims(i: Int, l: Long, d: Double, s: String, b: Boolean, date: Date)
+/*  case class SimpleClaims(i: Int, l: Long, d: Double, s: String, b: Boolean, date: Date)
   case class ClaimsWithTraversable(ss: List[String], ls: List[Long], is: List[Int])
   case class ClaimsWithOptions(maybeI: Option[Int], maybeS: Option[String])
   case class MappedClaims(uuid: UUID)
@@ -82,7 +86,82 @@ class JwtClaimSpecs extends FlatSpec with Matchers {
   "JwtClaim with Claims (mapped))" should behave like JwtToken(MappedClaims(UUID.randomUUID()))
 
   "JwtClaim with Claims (mapped traversable))" should behave like JwtToken(
-    MappedTraversable(Seq(UUID.randomUUID())))
+    MappedTraversable(Seq(UUID.randomUUID())))*/
+
+  implicit val byHandClaims = Claims.of[Record.`"name" -> String, "id" -> Int`.T]
+
+  "JwtClaim with Claims (record-syntax))" should behave like JwtToken(
+    ("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+
+  "JwtClaim with public headers set" should "be encoded and decoded" in assertDecoded(
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .about("Marcin")
+      .to("All the people")
+      .by("Test")
+      .issuedNow
+      .expiresIn(Duration.ofMinutes(1))
+      .startsNow)
+
+  it should "be verified" in assertDecoded(
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .about("Marcin")
+      .to("All the people")
+      .by("Test")
+      .as("1")
+      .issuedNow
+      .expiresIn(Duration.ofMinutes(1))
+      .startsNow,
+    sub = Subject(Some("Marcin")),
+    aud = Audience(Some(Set("All the people"))),
+    iss = Issuer(Some("Test")),
+    jti = JwtId(Some("1"))
+  )
+
+  it should "be verified if the audience header contains at least one required value" in assertDecoded(
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .about("Marcin")
+      .to(List("All the people", "Universe"))
+      .by("Test")
+      .as("1")
+      .issuedNow
+      .expiresIn(Duration.ofMinutes(1))
+      .startsNow,
+    aud = Audience(Some(Set("Universe")))
+  )
+
+  it should "fail to decode if expired" in assertFailed[TokenExpiredException](
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .issuedAt(Instant.now().minus(2, DAYS))
+      .expiresAt(Instant.now().minus(2, HOURS)))
+
+  it should "fail to decode if wrong secret is used" in assertFailed[
+    SignatureVerificationException](
+    JwtClaim(("name" ->> "Marcin Rzeźnicki") :: ("id" ->> 75643) :: HNil)
+      .about("Marcin"),
+    decodingAlgorithm = Algorithm.HMAC512("DEADBEEF"))
+
+  it should "fail to decode if wrong algorithm is used" in assertFailed[AlgorithmMismatchException](
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .about("Marcin"),
+    decodingAlgorithm = Algorithm.HMAC256("CAFEBABE"))
+
+  it should "fail to decode if required claim is not set" in assertFailed[InvalidClaimException](
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .about("Marcin"),
+    sub = Subject(Some("Not Marcin")))
+
+  it should "fail to decode if required claim is missing" in assertFailed[InvalidClaimException](
+    JwtClaim(("name" ->> "Marcin") :: ("id" ->> 3) :: HNil)
+      .about("Marcin"),
+    sub = Subject(Some("Marcin")),
+    iss = Issuer(Some("Test")))
+
+  it should "fail to decode if audience header does not contain any required value" in assertFailed[
+    InvalidClaimException](
+    JwtClaim(("name" ->> "Marcin Rzeźnicki") :: ("id" ->> 2434657) :: HNil)
+      .to(List("All the people", "All the cats")),
+    aud = Audience(Some(Set("All the dogs", "All the hobbitses")))
+  )
 
 
 }
