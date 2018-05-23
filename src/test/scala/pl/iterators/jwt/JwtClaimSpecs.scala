@@ -69,7 +69,7 @@ class JwtClaimSpecs extends FlatSpec with Matchers {
 
   import GenericEncodeDecodeBehaviors._
 
-/*  case class SimpleClaims(i: Int, l: Long, d: Double, s: String, b: Boolean, date: Date)
+  case class SimpleClaims(i: Int, l: Long, d: Double, s: String, b: Boolean, date: Date)
   case class ClaimsWithTraversable(ss: List[String], ls: List[Long], is: List[Int])
   case class ClaimsWithOptions(maybeI: Option[Int], maybeS: Option[String])
   case class MappedClaims(uuid: UUID)
@@ -86,7 +86,7 @@ class JwtClaimSpecs extends FlatSpec with Matchers {
   "JwtClaim with Claims (mapped))" should behave like JwtToken(MappedClaims(UUID.randomUUID()))
 
   "JwtClaim with Claims (mapped traversable))" should behave like JwtToken(
-    MappedTraversable(Seq(UUID.randomUUID())))*/
+    MappedTraversable(Seq(UUID.randomUUID())))
 
   implicit val byHandClaims = Claims.of[Record.`"name" -> String, "id" -> Int`.T]
 
