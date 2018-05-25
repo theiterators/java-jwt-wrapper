@@ -163,6 +163,15 @@ class JwtClaimSpecs extends FlatSpec with Matchers {
     aud = Audience(Some(Set("All the dogs", "All the hobbitses")))
   )
 
+  sealed trait Hierarchy
+  case class Class1(a: Int)    extends Hierarchy
+  case class Class2(a: String) extends Hierarchy
+
+  "JwtClaim with Claims (sealed trait hierarchy #1))" should behave like JwtToken[Hierarchy](
+    Class1(10))
+  "JwtClaim with Claims (sealed trait hierarchy #2))" should behave like JwtToken[Hierarchy](
+    Class2("10"))
+
 
 }
 // scalafix:on
